@@ -1,0 +1,36 @@
+name: Build Mobile App
+on: [push]
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - run: npm install
+      - run: npx cap sync android
+      - name: Build APK
+        run: |
+          cd android
+          ./gradlew assembleDebug
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - run: npm install
+      - run: npx cap sync ios
+      - name: Build iOS (No Signing)
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphoneos build CODE_SIGNING_ALLOWED=NO
+      # Note: Sans certificat Apple, tu obtiendras un dossier .app, pas encore un .ipa

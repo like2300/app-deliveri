@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deliveri App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        [x-cloak] { display: none !important; }
+        /* Animation fluide pour les modals */
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
+        .fade-enter, .fade-leave-to { opacity: 0; }
+        /* Scrollbar masquée pour le look app */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Couleur SkyBlue personnalisée basée sur ton code hex */
+        .bg-brand { background-color: #157cda; }
+        .text-brand { color: #157cda; }
+        .border-brand { border-color: #157cda; }
+    </style>
+</head>
+<body class="bg-slate-50 font-sans text-slate-800 selection:bg-[#157cda] selection:text-white" x-data="appData()">
+
+    <aside class="hidden lg:flex flex-col w-72 bg-white h-screen fixed left-0 top-0 border-r border-slate-100 z-50 px-6 py-8">
+        <div class="flex items-center gap-3 mb-10">
+            <img :src="getImageUrl(db.company_config.logo)" class="w-10 h-10 rounded-xl bg-slate-100 object-cover">
+            <h1 class="text-2xl font-black text-slate-900 tracking-tight" x-text="db.company_config.name"></h1>
+        </div>
+
+        <nav class="space-y-2 flex-1">
+            <template x-for="item in navItems">
+                <a href="#" @click.prevent="currentTab = item.id"
+                   class="flex items-center gap-4 px-4 py-3 rounded-2xl transition-all duration-300 group"
+                   :class="currentTab === item.id ? 'bg-[#157cda] text-white shadow-lg shadow-blue-200' : 'text-slate-500 hover:bg-slate-50'">
+                    <i :class="item.icon" class="text-lg"></i>
+                    <span class="font-medium" x-text="item.label"></span>
+                </a>
+            </template>
+        </nav>
+
+        <div class="bg-slate-50 p-4 rounded-3xl border border-slate-100" x-show="cart.length > 0">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-xs font-bold text-slate-400">MON PANIER</span>
+                <span class="text-xs font-bold text-[#157cda]" x-text="cartCount() + ' items'"></span>
+            </div>
+            <div class="text-2xl font-black text-slate-800 mb-3" x-text="formatPrice(cartTotal())"></div>
+            <button @click="isCartOpen = true" class="w-full py-2 bg-[#157cda] text-white rounded-xl text-sm font-bold hover:brightness-110 transition">
+                Voir le panier
+            </button>
+        </div>
+    </aside>
+
+    <main class="lg:ml-72 pb-32 lg:pb-10 min-h-screen relative">
+
+        <header class="lg:hidden flex justify-between items-center p-5 sticky top-0 bg-white/80 backdrop-blur-md z-40">
+            <div class="flex items-center gap-2">
+                <img :src="getImageUrl(db.company_config.logo)" class="w-8 h-8 rounded-lg bg-slate-100 object-cover">
+                <span class="font-bold text-lg" x-text="db.company_config.name"></span>
+            </div>
+            <div class="relative" @click="isCartOpen = true">
+                <div class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 shadow-sm">
+                    <i class="fa-solid fa-shopping-bag"></i>
+                </div>
+                <div x-show="cart.length > 0" class="absolute -top-1 -right-1 w-5 h-5 bg-[#157cda] text-white text-[10px] flex items-center justify-center rounded-full font-bold border-2 border-white" x-text="cartCount()"></div>
+            </div>
+        </header>
+
+        <div x-show="currentTab === 'home'" x-transition.opacity class="p-5 lg:p-10 max-w-7xl mx-auto">
+            <template x-if="db.sliders && db.sliders.length > 0">
+                <div class="relative h-48 lg:h-80 rounded-[1rem] overflow-hidden shadow-xl mb-8 group">
+                    <template x-for="(slide, index) in db.sliders" :key="slide.id">
+                        <div x-show="activeSlide === index" class="absolute inset-0 transition-opacity duration-700">
+                            <img :src="getImageUrl(slide.image)" class="w-full h-full object-cover">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-6 lg:p-10">
+                                <span class="bg-[#157cda] text-white text-xs font-bold px-3 py-1 rounded-full w-fit mb-2">Nouveauté</span>
+                                <h2 class="text-white text-2xl lg:text-4xl font-bold" x-text="slide.title"></h2>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </template>
+
+            <template x-if="!db.sliders || db.sliders.length === 0">
+                <div class="relative h-48 lg:h-80 rounded-[2.5rem] overflow-hidden shadow-xl mb-8 bg-slate-100 flex items-center justify-center">
+                    <div class="text-center">
+                        <div class="text-5xl mb-4">🖼️</div>
+                        <h2 class="text-xl font-bold text-slate-600">Aucun slider disponible</h2>
+                        <p class="text-slate-500 mt-2">Les images promotionnelles seront bientôt ajoutées</p>
+                    </div>
+                </div>
+            </template>
+
+            <template x-if="db.boutiques && db.boutiques.length > 0">
+                <div class="flex gap-4 overflow-x-auto no-scrollbar pb-4 mb-6">
+                    <button @click="selectedBoutique = null"
+                            class="px-6 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all border"
+                            :class="selectedBoutique === null ? 'bg-[#157cda] text-white border-[#157cda]' : 'bg-white text-slate-500 border-slate-200'">
+                        Tout voir
+                    </button>
+                    <template x-for="btq in db.boutiques" :key="btq.id">
+                        <button @click="selectedBoutique = btq.id"
+                                class="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all border"
+                                :class="selectedBoutique === btq.id ? 'bg-[#157cda] text-white border-[#157cda]' : 'bg-white text-slate-500 border-slate-200'">
+                            <img :src="getImageUrl(btq.image)" class="w-5 h-5 rounded-full bg-white object-cover">
+                            <span x-text="btq.name"></span>
+                        </button>
+                    </template>
+                </div>
+            </template>
+
+            <template x-if="!db.boutiques || db.boutiques.length === 0">
+                <div class="py-4 mb-6 text-center">
+                    <p class="text-slate-500">Aucune boutique disponible pour le moment</p>
+                </div>
+            </template>
+
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
+                <template x-if="filteredProducts.length > 0">
+                    <template x-for="product in filteredProducts" :key="product.id">
+                        <div @click="openProductDetail(product)" class="bg-white p-3 rounded-[2rem] shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer border border-slate-100 group">
+                            <div class="relative mb-3 overflow-hidden rounded-[1.5rem]">
+                                <img :src="getImageUrl(product.image)" class="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-500">
+                                <button class="absolute bottom-2 right-2 w-8 h-8 bg-white/90 backdrop-blur rounded-full flex items-center justify-center text-[#157cda] shadow-sm">
+                                    <i class="fa-solid fa-plus"></i>
+                                </button>
+                            </div>
+                            <div class="px-1">
+                                <h3 class="font-bold text-slate-800 text-sm truncate" x-text="product.title"></h3>
+                                <p class="text-xs text-slate-400 truncate mb-2" x-text="product.description"></p>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[#157cda] font-black" x-text="formatPrice(product.price)"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </template>
+
+                <template x-if="filteredProducts.length === 0">
+                    <div class="col-span-full flex flex-col items-center justify-center py-12 text-center">
+                        <div class="text-5xl mb-4" x-text="selectedBoutique ? '🏪' : '🔍'"></div>
+                        <h3 class="text-xl font-bold text-slate-800 mb-2" x-text="selectedBoutique ? 'Aucun produit dans cette boutique' : 'Aucun produit trouvé'"></h3>
+                        <p class="text-slate-500" x-text="selectedBoutique ? 'Cette boutique n\'a pas encore de produits.' : 'Aucun produit ne correspond à vos critères de recherche.'"></p>
+                        <button @click="selectedBoutique = null" x-show="selectedBoutique" class="mt-4 px-4 py-2 bg-[#157cda] text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition">
+                            Voir toutes les boutiques
+                        </button>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <div x-show="currentTab === 'store'" x-transition.opacity class="p-5 lg:p-10 max-w-4xl mx-auto">
+            <h2 class="text-2xl font-bold mb-6">Tous les produits</h2>
+
+            <!-- Barre de recherche -->
+            <template x-if="db.products && db.products.length > 0">
+                <div class="relative mb-6">
+                    <input
+                        type="text"
+                        placeholder="Rechercher un produit..."
+                        @input="searchTerm = $event.target.value"
+                        class="w-full bg-white border border-slate-200 shadow-sm rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-[#157cda] focus:border-transparent"
+                    >
+                    <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                </div>
+            </template>
+
+            <template x-if="db.products && db.products.length > 0">
+                <template x-if="filteredStoreProducts.length > 0">
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
+                        <template x-for="product in filteredStoreProducts" :key="product.id">
+                            <div @click="openProductDetail(product)" class="bg-white p-3 rounded-[2rem] shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer border border-slate-100 group">
+                                <div class="relative mb-3 overflow-hidden rounded-[1.5rem]">
+                                    <img :src="getImageUrl(product.image)" class="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-500">
+                                    <button @click.stop="addToCart(product)" class="absolute bottom-2 right-2 w-8 h-8 bg-white/90 backdrop-blur rounded-full flex items-center justify-center text-[#157cda] shadow-sm">
+                                        <i class="fa-solid fa-plus"></i>
+                                    </button>
+                                </div>
+                                <div class="px-1">
+                                    <h3 class="font-bold text-slate-800 text-sm truncate" x-text="product.title"></h3>
+                                    <p class="text-xs text-slate-400 truncate mb-2" x-text="product.description"></p>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-[#157cda] font-black" x-text="formatPrice(product.price)"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <template x-if="filteredStoreProducts.length === 0 && searchTerm">
+                    <div class="flex flex-col items-center justify-center py-12 text-center">
+                        <div class="text-5xl mb-4">🔍</div>
+                        <h3 class="text-xl font-bold text-slate-800 mb-2">Aucun produit trouvé</h3>
+                        <p class="text-slate-500" x-text="getSearchMessage()"></p>
+                        <button @click="searchTerm = ''" class="mt-4 px-4 py-2 bg-[#157cda] text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition">
+                            Réinitialiser la recherche
+                        </button>
+                    </div>
+                </template>
+
+                <template x-if="filteredStoreProducts.length === 0 && !searchTerm">
+                    <div class="flex flex-col items-center justify-center py-12 text-center">
+                        <div class="text-5xl mb-4">📦</div>
+                        <h3 class="text-xl font-bold text-slate-800 mb-2">Aucun produit disponible</h3>
+                        <p class="text-slate-500">Il n'y a actuellement aucun produit dans la boutique.</p>
+                    </div>
+                </template>
+            </template>
+
+            <template x-if="!db.products || db.products.length === 0">
+                <div class="flex flex-col items-center justify-center py-12 text-center">
+                    <div class="text-5xl mb-4">🛒</div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">Aucun produit disponible</h3>
+                    <p class="text-slate-500">La boutique n'a pas encore de produits en ligne.</p>
+                </div>
+            </template>
+        </div>
+
+        <div x-show="currentTab === 'contact'" x-transition.opacity class="p-5 lg:p-10 max-w-2xl mx-auto text-center">
+            <template x-if="db.company_config">
+                <div class="bg-white rounded-3xl p-8 shadow-xl border border-slate-100">
+                    <img :src="getImageUrl(db.company_config.logo)" class="w-24 h-24 mx-auto rounded-full mb-4 object-cover bg-slate-50">
+                    <h2 class="text-2xl font-bold mb-2" x-text="db.company_config.name"></h2>
+                    <p class="text-slate-500 mb-6" x-text="db.company_config.address"></p>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <a :href="'tel:' + db.company_config.whatsapp_number" class="p-4 bg-slate-50 rounded-2xl flex flex-col items-center gap-2 hover:bg-slate-100">
+                            <i class="fa-solid fa-phone text-[#157cda] text-xl"></i>
+                            <span class="text-xs font-bold text-slate-600">Appeler</span>
+                        </a>
+                        <a :href="'mailto:' + db.company_config.email" class="p-4 bg-slate-50 rounded-2xl flex flex-col items-center gap-2 hover:bg-slate-100">
+                            <i class="fa-solid fa-envelope text-[#157cda] text-xl"></i>
+                            <span class="text-xs font-bold text-slate-600">Email</span>
+                        </a>
+                    </div>
+                </div>
+            </template>
+
+            <template x-if="!db.company_config">
+                <div class="bg-white rounded-3xl p-8 shadow-xl border border-slate-100">
+                    <div class="text-center">
+                        <div class="text-5xl mb-4">🏢</div>
+                        <h2 class="text-2xl font-bold text-slate-600 mb-2">Informations de contact</h2>
+                        <p class="text-slate-500 mb-6">Les informations de contact seront bientôt disponibles</p>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </main>
+
+    <div x-show="selectedProduct" class="fixed inset-0 z-[60] flex items-end lg:items-center justify-center pointer-events-none" x-cloak>
+        <div x-show="selectedProduct" @click="selectedProduct = null" x-transition.opacity class="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto"></div>
+
+        <div x-show="selectedProduct"
+             x-transition:enter="transition transform ease-out duration-300"
+             x-transition:enter-start="translate-y-full lg:scale-95 lg:opacity-0"
+             x-transition:enter-end="translate-y-0 lg:scale-100 lg:opacity-100"
+             x-transition:leave="transition transform ease-in duration-200"
+             x-transition:leave-end="translate-y-full lg:scale-95 lg:opacity-0"
+             class="bg-white w-full lg:w-[500px] h-[85vh] lg:h-auto rounded-t-[2.5rem] lg:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col pointer-events-auto relative">
+
+            <div class="relative h-64 lg:h-72 bg-slate-100">
+                <button @click="selectedProduct = null" class="absolute top-4 right-4 w-10 h-10 bg-black/20 text-white rounded-full flex items-center justify-center backdrop-blur z-10">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                <img :src="selectedProduct ? getImageUrl(selectedProduct.image) : ''" class="w-full h-full object-cover">
+            </div>
+
+            <div class="p-6 flex-1 overflow-y-auto">
+                <div class="flex justify-between items-start mb-2">
+                    <h2 class="text-2xl font-black text-slate-900" x-text="selectedProduct?.title"></h2>
+                    <span class="text-xl font-bold text-[#157cda]" x-text="selectedProduct ? formatPrice(selectedProduct.price) : ''"></span>
+                </div>
+                <div class="flex gap-2 mb-6">
+                    <span class="bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full" x-show="selectedProduct?.stock > 0">En stock</span>
+                    <span class="bg-slate-100 text-slate-500 text-xs font-bold px-3 py-1 rounded-full" x-text="'Réf: ' + selectedProduct?.id"></span>
+                </div>
+                <p class="text-slate-500 leading-relaxed mb-6" x-text="selectedProduct?.description"></p>
+            </div>
+
+            <div class="p-6 border-t border-slate-100 bg-white">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center bg-slate-100 rounded-xl px-2 py-1">
+                        <button @click="detailQty > 1 ? detailQty-- : null" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-800 font-bold">-</button>
+                        <span class="w-8 text-center font-bold text-slate-900" x-text="detailQty"></span>
+                        <button @click="detailQty++" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-800 font-bold">+</button>
+                    </div>
+                    <button @click="addToCart(selectedProduct, detailQty); selectedProduct = null" class="flex-1 bg-[#157cda] text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-blue-200 hover:brightness-105 transition active:scale-95">
+                        Ajouter au panier
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="isCartOpen" class="fixed inset-0 z-[70] flex justify-end pointer-events-none" x-cloak>
+        <div x-show="isCartOpen" @click="isCartOpen = false" x-transition.opacity class="absolute inset-0 bg-black/20 backdrop-blur-sm pointer-events-auto"></div>
+
+        <div x-show="isCartOpen"
+             x-transition:enter="transition transform ease-out duration-300"
+             x-transition:enter-start="translate-x-full"
+             x-transition:enter-end="translate-x-0"
+             x-transition:leave="transition transform ease-in duration-200"
+             x-transition:leave-end="translate-x-full"
+             class="bg-white z-[70] w-full lg:w-[450px] h-screen lg:h-screen shadow-2xl pointer-events-auto flex flex-col rounded-t-2xl">
+
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-white z-10">
+                <h2 class="text-xl font-bold">Mon Panier</h2>
+                <button @click="isCartOpen = false" class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-6 space-y-4">
+                <template x-if="cart.length === 0">
+                    <div class="flex flex-col items-center justify-center h-64 text-slate-400">
+                        <i class="fa-solid fa-basket-shopping text-4xl mb-4 text-slate-200"></i>
+                        <p>Votre panier est vide</p>
+                    </div>
+                </template>
+
+                <template x-for="(item, index) in cart" :key="index">
+                    <div class="flex gap-4 p-3 bg-slate-50 rounded-2xl border border-slate-100 relative group">
+                        <img :src="getImageUrl(item.product.image)" class="w-20 h-20 rounded-xl object-cover bg-white">
+                        <div class="flex-1">
+                            <h4 class="font-bold text-slate-800 text-sm mb-1" x-text="item.product.title"></h4>
+                            <p class="text-[#157cda] font-bold text-xs" x-text="formatPrice(item.product.price)"></p>
+                            <div class="flex items-center gap-3 mt-3">
+                                <button @click="updateQty(item.product.id, -1)" class="w-6 h-6 bg-white rounded-md shadow-sm text-xs font-bold">-</button>
+                                <span class="text-xs font-bold" x-text="item.qty"></span>
+                                <button @click="updateQty(item.product.id, 1)" class="w-6 h-6 bg-white rounded-md shadow-sm text-xs font-bold">+</button>
+                            </div>
+                        </div>
+                        <button @click="removeFromCart(index)" class="absolute top-3 right-3 text-slate-300 hover:text-red-500">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </template>
+            </div>
+
+            <div class="p-6 bg-white border-t border-slate-100">
+                <div class="flex justify-between items-end mb-4">
+                    <span class="text-slate-500 font-medium">Total</span>
+                    <span class="text-2xl font-black text-slate-900" x-text="formatPrice(cartTotal())"></span>
+                </div>
+                <button @click="checkoutWhatsApp()" :disabled="cart.length === 0" class="w-full bg-[#25D366] text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:brightness-105 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg">
+                    <i class="fa-brands fa-whatsapp text-xl"></i>
+                    Commander sur WhatsApp
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="fixed rounded-2xl bottom-4 z-50 w-full lg:hidden px-4">
+        <div class="w-full max-w-sm mx-auto p-1 backdrop-blur-xl bg-white/90 border border-white/20 rounded-2xl shadow-2xl shadow-blue-900/10">
+            <div class="grid grid-cols-3 gap-1" role="group">
+
+                <button @click="currentTab = 'home'" type="button"
+                        class="px-5 flex items-center justify-center flex-col py-2 rounded-xl transition-all duration-300"
+                        :class="currentTab === 'home' ? 'bg-[#157cda]' : 'hover:bg-gray-100'">
+                    <svg class="w-6 h-6 transition-colors" :class="currentTab === 'home' ? 'text-white' : 'text-gray-400'" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12.71 2.29a1 1 0 0 0-1.42 0l-9 9a1 1 0 0 0 0 1.42A1 1 0 0 0 3 13h1v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7h1a1 1 0 0 0 1-1 1 1 0 0 0-.29-.71zM6 20v-9.59l6-6 6 6V20z"></path>
+                    </svg>
+                    <span class="text-[10px] mt-1 font-medium transition-colors" :class="currentTab === 'home' ? 'text-white' : 'text-gray-400'">Home</span>
+                </button>
+
+                <button @click="currentTab = 'store'" type="button"
+                        class="px-5 flex items-center justify-center flex-col py-2 rounded-xl transition-all duration-300"
+                        :class="currentTab === 'store' ? 'bg-[#157cda]' : 'hover:bg-gray-100'">
+                    <svg class="w-6 h-6 transition-colors" :class="currentTab === 'store' ? 'text-white' : 'text-gray-400'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19.148 2.971A2.008 2.008 0 0 0 17.434 2H6.566c-.698 0-1.355.372-1.714.971L2.143 7.485A.995.995 0 0 0 2 8a3.97 3.97 0 0 0 1 2.618V19c0 1.103.897 2 2 2h14c1.103 0 2-.897 2-2v-8.382A3.97 3.97 0 0 0 22 8a.995.995 0 0 0-.143-.515l-2.709-4.514zm.836 5.28A2.003 2.003 0 0 1 18 10c-1.103 0-2-.897-2-2 0-.068-.025-.128-.039-.192l.02-.004L15.22 4h2.214l2.55 4.251zM10.819 4h2.361l.813 4.065C13.958 9.137 13.08 10 12 10s-1.958-.863-1.993-1.935L10.819 4zM6.566 4H8.78l-.76 3.804.02.004C8.025 7.872 8 7.932 8 8c0 1.103-.897 2-2 2a2.003 2.003 0 0 1-1.984-1.749L6.566 4zM10 19v-3h4v3h-4zm6 0v-3c0-1.103-.897-2-2-2h-4c-1.103 0-2 .897-2 2v3H5v-7.142c.321.083.652.142 1 .142a3.99 3.99 0 0 0 3-1.357c.733.832 1.807 1.357 3 1.357s2.267-.525 3-1.357A3.99 3.99 0 0 0 18 12c.348 0 .679-.059 1-.142V19h-3z"></path></svg>
+                    <span class="text-[10px] mt-1 font-medium transition-colors" :class="currentTab === 'store' ? 'text-white' : 'text-gray-400'">Store</span>
+                </button>
+
+                <button @click="currentTab = 'contact'" type="button"
+                        class="px-5 flex items-center justify-center flex-col py-2 rounded-xl transition-all duration-300"
+                        :class="currentTab === 'contact' ? 'bg-[#157cda]' : 'hover:bg-gray-100'">
+                    <svg class="w-6 h-6 transition-colors" :class="currentTab === 'contact' ? 'text-white' : 'text-gray-400'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M16.57 22a2 2 0 0 0 1.43-.59l2.71-2.71a1 1 0 0 0 0-1.41l-4-4a1 1 0 0 0-1.41 0l-1.6 1.59a7.55 7.55 0 0 1-3-1.59 7.62 7.62 0 0 1-1.59-3l1.59-1.6a1 1 0 0 0 0-1.41l-4-4a1 1 0 0 0-1.41 0L2.59 6A2 2 0 0 0 2 7.43 15.28 15.28 0 0 0 6.3 17.7 15.28 15.28 0 0 0 16.57 22zM6 5.41 8.59 8 7.3 9.29a1 1 0 0 0-.3.91 10.12 10.12 0 0 0 2.3 4.5 10.08 10.08 0 0 0 4.5 2.3 1 1 0 0 0 .91-.27L16 15.41 18.59 18l-2 2a13.28 13.28 0 0 1-8.87-3.71A13.28 13.28 0 0 1 4 7.41zM20 11h2a8.81 8.81 0 0 0-9-9v2a6.77 6.77 0 0 1 7 7z"></path><path d="M13 8c2.1 0 3 .9 3 3h2c0-3.22-1.78-5-5-5z"></path></svg>
+                    <span class="text-[10px] mt-1 font-medium transition-colors" :class="currentTab === 'contact' ? 'text-white' : 'text-gray-400'">Contact</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function appData() {
+            return {
+                currentTab: 'home',
+                selectedBoutique: null,
+                selectedProduct: null,
+                isCartOpen: false,
+                activeSlide: 0,
+                detailQty: 1,
+                cart: [],
+                navItems: [
+                    { id: 'home', label: 'Accueil', icon: 'fa-solid fa-house' },
+                    { id: 'store', label: 'Boutique', icon: 'fa-solid fa-store' },
+                    { id: 'contact', label: 'Contact', icon: 'fa-solid fa-address-book' }
+                ],
+                // DONNÉES SIMULÉES (Pour tester)
+                // Dans la vraie app Django, tu injecteras le JSON ici
+                searchTerm: '',
+                async init() {
+                    // Charger les données depuis l'API
+                    try {
+                        const response = await fetch('http://127.0.0.1:8000/api/init-app-data/');
+                        if (response.ok) {
+                            const apiData = await response.json();
+
+                            // Reformater les données pour correspondre à la structure attendue
+                            this.db = {
+                                company_config: apiData.company_config,
+                                sliders: apiData.sliders || [],
+                                boutiques: apiData.boutiques || [],
+                                // Extraire tous les produits de toutes les boutiques
+                                products: apiData.boutiques ? apiData.boutiques.flatMap(boutique =>
+                                    boutique.products || []
+                                ) : []
+                            };
+                        } else {
+                            console.error('Erreur HTTP:', response.status);
+                            alert('Erreur de chargement des données: ' + response.status);
+                        }
+                    } catch (error) {
+                        console.error('Erreur lors du chargement des données:', error);
+                        alert('Impossible de se connecter à l\'API. Veuillez vérifier que le serveur Django est en cours d\'exécution et que CORS est correctement configuré.');
+
+                        // Utiliser des données par défaut en cas d'échec
+                        this.db = {
+                            "company_config": {
+                                "name": "Deliveri",
+                                "whatsapp_number": "24206000000",
+                                "address": "Brazzaville Mall, Congo",
+                                "email": "contact@deliveri.com",
+                                "logo": "https://cdn-icons-png.flaticon.com/512/3081/3081559.png"
+                            },
+                            "sliders": [
+                                { "id": 1, "image": "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=800&q=80", "title": "Promo Flash", "description": "Offres exclusives" },
+                                { "id": 2, "image": "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=800&q=80", "title": "Nouvelle Collection", "description": "Arrivage massif" }
+                            ],
+                            "boutiques": [
+                                { "id": 1, "name": "Mode & Beauté", "image": "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=100&q=80" },
+                                { "id": 2, "name": "Électronique", "image": "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=100&q=80" },
+                                { "id": 3, "name": "Maison", "image": "https://images.unsplash.com/photo-1513694203232-719a280e022f?w=100&q=80" }
+                            ],
+                            "products": [
+                                { "id": 1, "title": "Smartphone Deliveri X", "description": "Dernière technologie, écran AMOLED 120Hz.", "price": "150000.00", "image": "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=500&q=80", "stock": 12, "boutique": 2 },
+                                { "id": 2, "title": "Montre Connectée", "description": "Suivi sportif et notifications.", "price": "45000.00", "image": "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&q=80", "stock": 5, "boutique": 2 },
+                                { "id": 3, "title": "Sneakers Urban", "description": "Confort absolu pour la ville.", "price": "25000.00", "image": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&q=80", "stock": 20, "boutique": 1 },
+                                { "id": 4, "title": "Lampe Design", "description": "Lumière douce pour salon.", "price": "12000.00", "image": "https://images.unsplash.com/photo-1507473888900-52e1adad54cd?w=500&q=80", "stock": 8, "boutique": 3 }
+                            ]
+                        };
+                    }
+
+                    // S'assurer que les données sont disponibles avant de démarrer le carrousel
+                    if (this.db && this.db.sliders && this.db.sliders.length > 0) {
+                        // Slide automatique
+                        setInterval(() => {
+                            this.activeSlide = (this.activeSlide + 1) % this.db.sliders.length;
+                        }, 4000);
+                    }
+                },
+
+                get filteredProducts() {
+                    if (!this.selectedBoutique) return this.db.products;
+                    return this.db.products.filter(p => p.boutique === this.selectedBoutique);
+                },
+
+                get filteredStoreProducts() {
+                    if (!this.searchTerm) return this.db.products;
+                    const term = this.searchTerm.toLowerCase();
+                    return this.db.products.filter(p =>
+                        p.title.toLowerCase().includes(term) ||
+                        p.description.toLowerCase().includes(term)
+                    );
+                },
+
+                getSearchMessage() {
+                    return `Aucun produit ne correspond à "${this.searchTerm}"...`;
+                },
+
+                getImageUrl(imagePath) {
+                    if (!imagePath) return '';
+                    if (imagePath.startsWith('http')) return imagePath;
+                    return 'http://127.0.0.1:8000' + imagePath;
+                },
+
+                formatPrice(price) {
+                    return new Intl.NumberFormat('fr-FR').format(price) + ' FCFA';
+                },
+
+                openProductDetail(product) {
+                    this.selectedProduct = product;
+                    this.detailQty = 1;
+                },
+
+                addToCart(product, qty = 1) {
+                    const existing = this.cart.find(item => item.product.id === product.id);
+                    if (existing) {
+                        existing.qty += qty;
+                    } else {
+                        this.cart.push({ product: product, qty: qty });
+                    }
+                    this.isCartOpen = true; // Ouvrir le panier pour confirmer
+                },
+
+                updateQty(productId, amount) {
+                    const index = this.cart.findIndex(item => item.product.id === productId);
+                    if (index !== -1) {
+                        this.cart[index].qty += amount;
+                        if (this.cart[index].qty <= 0) {
+                            this.cart.splice(index, 1);
+                        }
+                    }
+                },
+
+                removeFromCart(index) {
+                    this.cart.splice(index, 1);
+                },
+
+                cartCount() {
+                    return this.cart.reduce((acc, item) => acc + item.qty, 0);
+                },
+
+                cartTotal() {
+                    return this.cart.reduce((acc, item) => acc + (parseFloat(item.product.price) * item.qty), 0);
+                },
+
+                checkoutWhatsApp() {
+                    if (this.cart.length === 0) return;
+
+                    const phone = this.db.company_config.whatsapp_number;
+                    let message = `Bonjour *${this.db.company_config.name}*, je souhaite passer une commande :\n\n`;
+
+                    this.cart.forEach(item => {
+                        message += `▫️ ${item.qty}x *${item.product.title}*\n`;
+                        message += `   (PU: ${this.formatPrice(item.product.price)})\n`;
+                    });
+
+                    message += `\n💰 *TOTAL : ${this.formatPrice(this.cartTotal())}*`;
+                    message += `\n\n📍 Merci de me confirmer la disponibilité.`;
+
+                    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+                    window.open(url, '_blank');
+                }
+            }
+        }
+    </script>
+</body>
+</html>
