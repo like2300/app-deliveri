@@ -14,22 +14,22 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
       - name: Install Dependencies
         run: npm install
 
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Build Android APK
+      - name: Upgrade Gradle Wrapper
         run: |
           cd android
           chmod +x gradlew
-          # On force l'utilisation du JDK 17 spécifiquement pour cette commande
+          # On force le passage à Gradle 8.5 pour supporter les libs Java 21
+          ./gradlew wrapper --gradle-version 8.5
+
+      - name: Build Android APK
+        run: |
+          cd android
           ./gradlew assembleDebug --no-daemon
         env:
           JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
