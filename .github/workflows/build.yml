@@ -5,37 +5,29 @@ jobs:
   build-android:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
+          cache: 'gradle'
 
-      - name: Install Dependencies
+      - name: Install Node Dependencies
         run: npm install
 
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Upgrade Gradle Wrapper
+      - name: Build APK
         run: |
           cd android
           chmod +x gradlew
-          # On force le passage à Gradle 8.5 pour supporter les libs Java 21
-          ./gradlew wrapper --gradle-version 8.5
-
-      - name: Build Android APK
-        run: |
-          cd android
-          ./gradlew assembleDebug --no-daemon
-        env:
-          JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Deliveri-Android-APK
+          name: Deliveri-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
