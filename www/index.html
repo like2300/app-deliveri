@@ -484,8 +484,19 @@
 
                 getImageUrl(imagePath) {
                     if (!imagePath) return '';
-                    if (imagePath.startsWith('http')) return imagePath;
-                    return 'http://127.0.0.1:8000' + imagePath;
+                    if (imagePath.startsWith('http')) {
+                        // Si c'est une image de votre API, ajouter un paramètre de cache-busting
+                        if (imagePath.includes('delivri.pythonanywhere.com')) {
+                            // Pour les images de votre API, ajouter un paramètre de cache-busting
+                            const url = new URL(imagePath);
+                            url.searchParams.set('t', Date.now().toString());
+                            return url.toString();
+                        } else {
+                            // Pour les autres URLs distantes, retourner tel quel
+                            return imagePath;
+                        }
+                    }
+                    return 'https://delivri.pythonanywhere.com' + imagePath + '?t=' + Date.now();
                 },
 
                 formatPrice(price) {
