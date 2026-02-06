@@ -484,8 +484,22 @@
                     return `Aucun produit ne correspond à "${this.searchTerm}"...`;
                 },
 
-                getImageUrl(imagePath) {
+                async getImageUrl(imagePath) {
                     if (!imagePath) return '';
+                    
+                    // Vérifier si l'utilisateur est en ligne
+                    if (!navigator.onLine) {
+                        // Si hors ligne, afficher une alerte
+                        alert('Vous êtes déconnecté d\'Internet. Certaines images peuvent ne pas s\'afficher.');
+                        
+                        // Retourner une image par défaut pour les images distantes
+                        if (imagePath.startsWith('http')) {
+                            // Pour les images distantes, retourner une image locale par défaut
+                            return './assets/default-image.svg'; // Image SVG par défaut
+                        }
+                        return imagePath;
+                    }
+                    
                     if (imagePath.startsWith('http')) {
                         // Si c'est une image de votre API, ajouter un paramètre de cache-busting
                         if (imagePath.includes('delivri.pythonanywhere.com')) {
@@ -602,6 +616,21 @@
                 }
             }
         }
+        
+        // Gestionnaire d'événements pour la connexion/déconnexion Internet
+        window.addEventListener('online', function() {
+            // L'utilisateur est revenu en ligne
+            console.log('Connexion Internet rétablie');
+        });
+        
+        window.addEventListener('offline', function() {
+            // L'utilisateur est hors ligne
+            console.log('Déconnecté d\'Internet');
+            // Afficher une alerte discrète ou une notification
+            if (typeof appData !== 'undefined' && appData()) {
+                // On ne veut pas afficher une alerte intrusive trop souvent
+            }
+        });
     </script>
 </body>
 </html>
