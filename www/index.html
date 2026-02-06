@@ -524,15 +524,17 @@
                     // Gestion des chemins d'images locaux dans l'environnement mobile
                     // Vérifier si nous sommes dans une application mobile Capacitor
                     if (window.Capacitor || document.URL.indexOf('file://') === 0) {
-                        // Environnement mobile - ajuster le chemin pour Capacitor
+                        // Environnement mobile - construire l'URL complète pour les chemins relatifs
                         if (imagePath.startsWith('/')) {
-                            return '.' + imagePath; // Convertir /chemin en ./chemin
+                            // Pour les chemins relatifs commençant par /, les convertir en URL absolue avec HTTPS
+                            return 'https://delivri.pythonanywhere.com' + imagePath;
                         } else {
+                            // Pour les chemins relatifs sans / initial, les traiter comme des chemins locaux
                             return './' + imagePath; // Chemin relatif standard
                         }
                     } else {
-                        // Environnement web, ajouter le protocole http:// pour les chemins relatifs
-                        return 'http://delivri.pythonanywhere.com' + imagePath + '?t=' + Date.now();
+                        // Environnement web, ajouter le protocole https:// pour les chemins relatifs
+                        return 'https://delivri.pythonanywhere.com' + imagePath + '?t=' + Date.now();
                     }
                 },
 
