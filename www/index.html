@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Deliveri App</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="./css/style.js"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
@@ -103,7 +103,7 @@
                     </button>
                     <template x-for="btq in db.boutiques" :key="btq.id">
                         <button @click="selectedBoutique = btq.id"
-                                class="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all border"
+                                class="flex items-center justify-center gap-2  px-5 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all border"
                                 :class="selectedBoutique === btq.id ? 'bg-[#157cda] text-white border-[#157cda]' : 'bg-white text-slate-500 border-slate-200'">
                             <img :src="getImageUrl(btq.image)" class="w-5 h-5 rounded-full bg-white object-cover">
                             <span x-text="btq.name"></span>
@@ -395,6 +395,8 @@
                 activeSlide: 0,
                 detailQty: 1,
                 cart: [],
+                maxPrice: 500000, // Prix max par défaut
+                selectedBoutiqueData: null, // Stockera l'objet boutique complet
                 navItems: [
                     { id: 'home', label: 'Accueil', icon: 'fa-solid fa-house' },
                     { id: 'store', label: 'Boutique', icon: 'fa-solid fa-store' },
@@ -496,7 +498,8 @@
                             return imagePath;
                         }
                     }
-                    return 'https://delivri.pythonanywhere.com' + imagePath + '?t=' + Date.now();
+                    // Ajouter le protocole http:// pour les chemins relatifs
+                    return 'http://delivri.pythonanywhere.com' + imagePath + '?t=' + Date.now();
                 },
 
                 formatPrice(price) {
@@ -544,15 +547,55 @@
                     if (this.cart.length === 0) return;
 
                     const phone = this.db.company_config.whatsapp_number;
-                    let message = `Bonjour *${this.db.company_config.name}*, je souhaite passer une commande :\n\n`;
+                    let message = '';
 
-                    this.cart.forEach(item => {
-                        message += `▫️ ${item.qty}x *${item.product.title}*\n`;
-                        message += `   (PU: ${this.formatPrice(item.product.price)})\n`;
+                    // Add first product image for Open Graph preview if there's only one item
+                    if (this.cart.length === 1) {
+                        const firstItem = this.cart[0];
+                        const imageUrl = this.getImageUrl(firstItem.product.image);
+                        // if (imageUrl) {
+                        //     message += `${imageUrl}\n\n`;
+                        // }
+                    }
+
+                    // Professional invoice-style message
+                    message += ` \n`;
+                    message += `*${this.db.company_config.name.toUpperCase()}*      \n`;
+                    message += `COMMANDE CLIENT      \n`;
+                    message += `\n\n`;
+
+                    message += `📅 Date: ${new Date().toLocaleDateString('fr-FR')}\n`;
+                    message += `🆔 Client: #${Math.floor(Math.random() * 10000)}\n\n`;
+
+                    message += `📦 DÉTAILS DE LA COMMANDE:\n`;
+                    message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+
+                    this.cart.forEach((item, index) => {
+                        // Find the shop name for the product
+                        const shop = this.db.boutiques.find(b => b.id === item.product.boutique);
+                        const shopName = shop ? shop.name : 'Boutique inconnue';
+
+                        message += `\n${index + 1}. *${item.product.title}*\n`;
+                        message += `   ┣ Boutique: ${shopName}\n`;
+                        message += `   ┣ Qté: ${item.qty}\n`;
+                        message += `   ┣ PU: ${this.formatPrice(item.product.price)}\n`;
+                        message += `   ┗ Total: ${this.formatPrice(parseFloat(item.product.price) * item.qty)}\n`;
+
+                        // Add product image URL to the message
+                        const imageUrl = this.getImageUrl(item.product.image);
+                        // if (imageUrl) {
+                        //     message += `   🖼️ Image: ${imageUrl}\n`;
+                        // }
+                        message += `   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
                     });
 
-                    message += `\n💰 *TOTAL : ${this.formatPrice(this.cartTotal())}*`;
-                    message += `\n\n📍 Merci de me confirmer la disponibilité.`;
+                    message += `\n💰 *TOTAL*: ${this.formatPrice(this.cartTotal())}`;
+                    message += `\n🚚 *LIVRAISON*: À DÉTERMINER`;
+                    message += `\n💳 *PAIEMENT*: À CONFIRMER`;
+                    message += `\n=====================================\n`;
+                    message += `\n💰 *MONTANT TOTAL*: ${this.formatPrice(this.cartTotal())}`;
+                    message += `\n\n📍 Merci de confirmer la disponibilité et les modalités de livraison.`;
+                    message += `\n\n📱 Commande passée via l'application ${this.db.company_config.name}`;
 
                     const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
                     window.open(url, '_blank');
