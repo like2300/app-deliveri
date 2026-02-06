@@ -485,13 +485,13 @@
                 },
 
                 async getImageUrl(imagePath) {
-                    if (!imagePath) return '';
-                    
+                    if (!imagePath) return './assets/default-image.svg';
+
                     // Vérifier si l'utilisateur est en ligne
                     if (!navigator.onLine) {
                         // Si hors ligne, afficher une alerte
                         alert('Vous êtes déconnecté d\'Internet. Certaines images peuvent ne pas s\'afficher.');
-                        
+
                         // Retourner une image par défaut pour les images distantes
                         if (imagePath.startsWith('http')) {
                             // Pour les images distantes, retourner une image locale par défaut
@@ -499,21 +499,41 @@
                         }
                         return imagePath;
                     }
-                    
+
                     if (imagePath.startsWith('http')) {
                         // Si c'est une image de votre API, ajouter un paramètre de cache-busting
                         if (imagePath.includes('delivri.pythonanywhere.com')) {
                             // Pour les images de votre API, ajouter un paramètre de cache-busting
                             const url = new URL(imagePath);
                             url.searchParams.set('t', Date.now().toString());
+                            
+                            // Pour l'environnement mobile, remplacer http par https pour éviter les problèmes de sécurité
+                            if (window.Capacitor || document.URL.indexOf('file://') === 0) {
+                                return url.toString().replace('http://', 'https://');
+                            }
                             return url.toString();
                         } else {
-                            // Pour les autres URLs distantes, retourner tel quel
+                            // Pour les autres URLs distantes, retourner tel quel mais avec HTTPS pour la sécurité mobile
+                            if (window.Capacitor || document.URL.indexOf('file://') === 0) {
+                                return imagePath.replace('http://', 'https://');
+                            }
                             return imagePath;
                         }
                     }
-                    // Ajouter le protocole http:// pour les chemins relatifs
-                    return 'http://delivri.pythonanywhere.com' + imagePath + '?t=' + Date.now();
+
+                    // Gestion des chemins d'images locaux dans l'environnement mobile
+                    // Vérifier si nous sommes dans une application mobile Capacitor
+                    if (window.Capacitor || document.URL.indexOf('file://') === 0) {
+                        // Environnement mobile - ajuster le chemin pour Capacitor
+                        if (imagePath.startsWith('/')) {
+                            return '.' + imagePath; // Convertir /chemin en ./chemin
+                        } else {
+                            return './' + imagePath; // Chemin relatif standard
+                        }
+                    } else {
+                        // Environnement web, ajouter le protocole http:// pour les chemins relatifs
+                        return 'http://delivri.pythonanywhere.com' + imagePath + '?t=' + Date.now();
+                    }
                 },
 
                 formatPrice(price) {
