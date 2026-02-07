@@ -24,6 +24,77 @@
     </style>
 </head>
 <body class="bg-slate-50 font-sans text-slate-800 selection:bg-[#157cda] selection:text-white" x-data="appData()">
+    <!-- Startup Screen - Choose between Client or Store Owner -->
+    <div x-show="!userTypeSelected && appInitialized" class="fixed inset-0 z-[100] flex items-center justify-center bg-white" x-cloak>
+        <div class="text-center p-8 max-w-md w-full mx-4 relative">
+            <div class="mb-8">
+                <img :src="db.company_config ? getImageUrl(db.company_config.logo) : 'https://cdn-icons-png.flaticon.com/512/3081/3081559.png'" class="w-24 h-24 mx-auto rounded-xl bg-slate-100 object-cover mb-4">
+                <h1 class="text-3xl font-black text-slate-900 mb-2" x-text="db.company_config ? db.company_config.name : 'Deliveri'"></h1>
+                <p class="text-slate-500">Connectez-vous ou choisissez votre rôle</p>
+            </div>
+            
+            <div class="space-y-4">
+                <button @click="selectUserType('client')" class="w-full bg-white border-2 border-slate-200 text-slate-800 py-4 rounded-2xl font-bold text-lg hover:bg-slate-50 transition flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-user text-xl"></i>
+                    Je suis un Client
+                </button>
+
+                <button @click="showLoginForBoutique" class="w-full bg-[#157cda] text-white py-4 rounded-2xl font-bold text-lg hover:bg-blue-700 transition flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-shop text-xl"></i>
+                    Je suis un Propriétaire de Boutique
+                </button>
+            </div>
+            
+            <p class="text-slate-400 text-sm mt-6">Choisissez votre rôle pour continuer</p>
+            
+            <!-- Login Modal - Positioned inside the startup screen to prevent conflicts -->
+            <div x-show="showLoginModal" class="fixed inset-0 z-[110] flex items-center justify-center" x-cloak>
+                <div x-show="showLoginModal" @click="showLoginModal = false" x-transition.opacity class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+
+                <div x-show="showLoginModal"
+                     @click.stop
+                     x-transition:enter="transition transform ease-out duration-300"
+                     x-transition:enter-start="scale-90 opacity-0"
+                     x-transition:enter-end="scale-100 opacity-100"
+                     x-transition:leave="transition transform ease-in duration-200"
+                     x-transition:leave-end="scale-90 opacity-0"
+                     class="bg-white w-full max-w-md mx-4 p-6 rounded-2xl shadow-2xl z-[120] relative">
+                     
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-bold text-slate-900">Connexion</h3>
+                        <button @click="showLoginModal = false" class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    
+                    <form @submit.prevent="handleLogin">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Nom d'utilisateur</label>
+                            <input type="text" 
+                                   x-model="loginForm.username" 
+                                   class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#157cda] focus:border-transparent" 
+                                   placeholder="Entrez votre nom d'utilisateur">
+                        </div>
+                        
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Mot de passe</label>
+                            <input type="password" 
+                                   x-model="loginForm.password" 
+                                   class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#157cda] focus:border-transparent" 
+                                   placeholder="Entrez votre mot de passe">
+                        </div>
+                        
+                        <button type="submit" 
+                                class="w-full bg-[#157cda] text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition">
+                            Se connecter
+                        </button>
+                        
+                        <div x-show="loginError" class="mt-3 p-3 bg-red-50 text-red-700 rounded-xl text-sm" x-text="loginError"></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <aside class="hidden lg:flex flex-col w-72 bg-white h-screen fixed left-0 top-0 border-r border-slate-100 z-50 px-6 py-8">
         <div class="flex items-center gap-3 mb-10">
@@ -33,11 +104,22 @@
 
         <nav class="space-y-2 flex-1">
             <template x-for="item in navItems">
-                <a href="#" @click.prevent="currentTab = item.id"
-                   class="flex items-center gap-4 px-4 py-3 rounded-2xl transition-all duration-300 group"
-                   :class="currentTab === item.id ? 'bg-[#157cda] text-white shadow-lg shadow-blue-200' : 'text-slate-500 hover:bg-slate-50'">
-                    <i :class="item.icon" class="text-lg"></i>
-                    <span class="font-medium" x-text="item.label"></span>
+                <template x-if="!(item.id === 'admin' && userType !== 'store_owner')">
+                    <a href="#" @click.prevent="currentTab = item.id"
+                       class="flex items-center gap-4 px-4 py-3 rounded-2xl transition-all duration-300 group"
+                       :class="currentTab === item.id ? 'bg-[#157cda] text-white shadow-lg shadow-blue-200' : 'text-slate-500 hover:bg-slate-50'">
+                        <i :class="item.icon" class="text-lg"></i>
+                        <span class="font-medium" x-text="item.label"></span>
+                    </a>
+                </template>
+            </template>
+            
+            <!-- Logout button for authenticated users -->
+            <template x-if="isAuthenticated">
+                <a href="#" @click.prevent="handleLogout()"
+                   class="flex items-center gap-4 px-4 py-3 rounded-2xl transition-all duration-300 group text-red-500 hover:bg-red-50 mt-4">
+                    <i class="fa-solid fa-right-from-bracket text-lg"></i>
+                    <span class="font-medium">Déconnexion</span>
                 </a>
             </template>
         </nav>
@@ -250,6 +332,118 @@
                 </div>
             </template>
         </div>
+        
+        <!-- Admin Section for Store Owners -->
+        <div x-show="currentTab === 'admin'" x-transition.opacity class="p-5 lg:p-10 max-w-6xl mx-auto" x-cloak>
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold text-slate-900 mb-2">Tableau de bord Boutique</h2>
+                <p class="text-slate-500">Gérez vos produits et votre boutique</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                            <i class="fa-solid fa-box text-blue-600 text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-slate-500 text-sm">Total Produits</p>
+                            <p class="text-2xl font-bold" x-text="db.products ? db.products.filter(p => p.boutique === user.id).length : 0"></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                            <i class="fa-solid fa-chart-line text-green-600 text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-slate-500 text-sm">Statistiques</p>
+                            <p class="text-2xl font-bold">Bientôt</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                            <i class="fa-solid fa-bell text-purple-600 text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-slate-500 text-sm">Notifications</p>
+                            <p class="text-2xl font-bold">0</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                    <h3 class="text-xl font-bold text-slate-900">Mes Produits</h3>
+                    <button @click="openAddProductModal()" class="bg-[#157cda] text-white px-4 py-2 rounded-xl font-medium flex items-center gap-2">
+                        <i class="fa-solid fa-plus"></i>
+                        Ajouter Produit
+                    </button>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="text-left p-4 text-slate-500 font-medium">Produit</th>
+                                <th class="text-left p-4 text-slate-500 font-medium">Prix</th>
+                                <th class="text-left p-4 text-slate-500 font-medium">Stock</th>
+                                <th class="text-left p-4 text-slate-500 font-medium">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="product in (db.products ? db.products.filter(p => p.boutique === user.id) : [])" :key="product.id">
+                                <tr class="border-b border-slate-100 hover:bg-slate-50">
+                                    <td class="p-4">
+                                        <div class="flex items-center gap-3">
+                                            <img :src="getImageUrl(product.image)" class="w-12 h-12 rounded-lg object-cover bg-slate-100">
+                                            <div>
+                                                <p class="font-medium text-slate-900" x-text="product.title"></p>
+                                                <p class="text-slate-500 text-sm" x-text="product.description.substring(0, 30) + '...'"></p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="p-4 text-slate-900 font-medium" x-text="formatPrice(product.price)"></td>
+                                    <td class="p-4">
+                                        <span class="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full" x-text="product.stock + ' en stock'"></span>
+                                    </td>
+                                    <td class="p-4">
+                                        <div class="flex gap-2">
+                                            <button @click="editProduct(product)" class="text-blue-600 hover:text-blue-800">
+                                                <i class="fa-solid fa-edit"></i>
+                                            </button>
+                                            <button @click="deleteProduct(product)" class="text-red-600 hover:text-red-800">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                            
+                            <template x-if="!(db.products && db.products.filter(p => p.boutique === user.id).length > 0)">
+                                <tr>
+                                    <td colspan="4" class="p-8 text-center text-slate-500">
+                                        <div class="flex flex-col items-center">
+                                            <i class="fa-solid fa-box-open text-4xl text-slate-300 mb-3"></i>
+                                            <p>Aucun produit trouvé. Commencez par ajouter un produit.</p>
+                                            <button @click="openAddProductModal()" class="mt-3 bg-[#157cda] text-white px-4 py-2 rounded-xl font-medium">
+                                                Ajouter un produit
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </main>
 
     <div x-show="selectedProduct" class="fixed inset-0 z-[60] flex items-end lg:items-center justify-center pointer-events-none" x-cloak>
@@ -375,12 +569,30 @@
                     <span class="text-[10px] mt-1 font-medium transition-colors" :class="currentTab === 'store' ? 'text-white' : 'text-gray-400'">Store</span>
                 </button>
 
+                <template x-if="userType === 'store_owner'">
+                    <button @click="currentTab = 'admin'" type="button"
+                            class="px-5 flex items-center justify-center flex-col py-2 rounded-xl transition-all duration-300"
+                            :class="currentTab === 'admin' ? 'bg-[#157cda]' : 'hover:bg-gray-100'">
+                        <i class="fa-solid fa-user-shield text-xl" :class="currentTab === 'admin' ? 'text-white' : 'text-gray-400'"></i>
+                        <span class="text-[10px] mt-1 font-medium transition-colors" :class="currentTab === 'admin' ? 'text-white' : 'text-gray-400'">Admin</span>
+                    </button>
+                </template>
+                
                 <button @click="currentTab = 'contact'" type="button"
                         class="px-5 flex items-center justify-center flex-col py-2 rounded-xl transition-all duration-300"
                         :class="currentTab === 'contact' ? 'bg-[#157cda]' : 'hover:bg-gray-100'">
                     <svg class="w-6 h-6 transition-colors" :class="currentTab === 'contact' ? 'text-white' : 'text-gray-400'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M16.57 22a2 2 0 0 0 1.43-.59l2.71-2.71a1 1 0 0 0 0-1.41l-4-4a1 1 0 0 0-1.41 0l-1.6 1.59a7.55 7.55 0 0 1-3-1.59 7.62 7.62 0 0 1-1.59-3l1.59-1.6a1 1 0 0 0 0-1.41l-4-4a1 1 0 0 0-1.41 0L2.59 6A2 2 0 0 0 2 7.43 15.28 15.28 0 0 0 6.3 17.7 15.28 15.28 0 0 0 16.57 22zM6 5.41 8.59 8 7.3 9.29a1 1 0 0 0-.3.91 10.12 10.12 0 0 0 2.3 4.5 10.08 10.08 0 0 0 4.5 2.3 1 1 0 0 0 .91-.27L16 15.41 18.59 18l-2 2a13.28 13.28 0 0 1-8.87-3.71A13.28 13.28 0 0 1 4 7.41zM20 11h2a8.81 8.81 0 0 0-9-9v2a6.77 6.77 0 0 1 7 7z"></path><path d="M13 8c2.1 0 3 .9 3 3h2c0-3.22-1.78-5-5-5z"></path></svg>
                     <span class="text-[10px] mt-1 font-medium transition-colors" :class="currentTab === 'contact' ? 'text-white' : 'text-gray-400'">Contact</span>
                 </button>
+                
+                <!-- Logout button for authenticated users on mobile -->
+                <template x-if="isAuthenticated">
+                    <button @click="handleLogout" type="button"
+                            class="px-5 flex items-center justify-center flex-col py-2 rounded-xl transition-all duration-300 text-red-500">
+                        <i class="fa-solid fa-right-from-bracket text-xl"></i>
+                        <span class="text-[10px] mt-1 font-medium">Déconnexion</span>
+                    </button>
+                </template>
             </div>
         </div>
     </div>
@@ -397,18 +609,31 @@
                 cart: [],
                 maxPrice: 500000, // Prix max par défaut
                 selectedBoutiqueData: null, // Stockera l'objet boutique complet
+                isAuthenticated: false, // Track if user is authenticated
+                userType: 'client', // 'client' or 'store_owner'
+                user: null, // Store user info
                 navItems: [
                     { id: 'home', label: 'Accueil', icon: 'fa-solid fa-house' },
                     { id: 'store', label: 'Boutique', icon: 'fa-solid fa-store' },
+                    { id: 'contact', label: 'Contact', icon: 'fa-solid fa-address-book' }
+                ],
+                // Admin navigation items for store owners
+                adminNavItems: [
+                    { id: 'home', label: 'Accueil', icon: 'fa-solid fa-house' },
+                    { id: 'store', label: 'Boutique', icon: 'fa-solid fa-store' },
+                    { id: 'admin', label: 'Admin', icon: 'fa-solid fa-user-shield' },
                     { id: 'contact', label: 'Contact', icon: 'fa-solid fa-address-book' }
                 ],
                 // DONNÉES SIMULÉES (Pour tester)
                 // Dans la vraie app Django, tu injecteras le JSON ici
                 searchTerm: '',
                 async init() {
+                    // Check if user is authenticated and determine user type
+                    await this.checkAuthStatus();
+                    
                     // Charger les données depuis l'API
                     try {
-                        const response = await fetch('https://delivri.pythonanywhere.com/api/init-app-data/');
+                        const response = await fetch('http://127.0.0.1:8000/api/init-app-data/');
                         if (response.ok) {
                             const apiData = await response.json();
 
@@ -464,6 +689,269 @@
                             this.activeSlide = (this.activeSlide + 1) % this.db.sliders.length;
                         }, 4000);
                     }
+                    
+                    // Mark app as initialized to show startup screen if needed
+                    this.appInitialized = true;
+                },
+
+                // Check if user is authenticated and determine user type
+                async checkAuthStatus() {
+                    try {
+                        console.log('Checking authentication status...');
+                        // Check if user is logged in by making a request to the dashboard endpoint
+                        const response = await fetch('http://127.0.0.1:8000/api/dashboard/', {
+                            credentials: 'include' // Include cookies for session authentication
+                        });
+                        
+                        console.log('Auth check response status:', response.status);
+                        
+                        if (response.ok) {
+                            this.isAuthenticated = true;
+                            const userData = await response.json();
+                            console.log('User data received:', userData);
+                            
+                            // If user has a boutique, they are a store owner
+                            if (userData && userData.id) {
+                                this.userType = 'store_owner';
+                                this.user = userData;
+                                
+                                // Update navigation items to include admin option
+                                this.navItems = this.adminNavItems;
+                                
+                                // Switch to admin tab if user is a store owner
+                                this.currentTab = 'admin';
+                                
+                                // Skip startup screen since user is authenticated
+                                this.userTypeSelected = true;
+                                console.log('User is store owner, showing admin panel');
+                            } else {
+                                this.userType = 'client';
+                                this.user = null;
+                                
+                                // Skip startup screen since user is authenticated
+                                this.userTypeSelected = true;
+                                console.log('User is client, showing client panel');
+                            }
+                        } else {
+                            // User is not authenticated, show startup screen
+                            this.isAuthenticated = false;
+                            this.userType = 'client';
+                            this.user = null;
+                            this.userTypeSelected = false; // Show startup screen
+                            console.log('User not authenticated, showing startup screen');
+                        }
+                    } catch (error) {
+                        console.error('Error checking auth status:', error);
+                        // Show startup screen if there's an error
+                        this.isAuthenticated = false;
+                        this.userType = 'client';
+                        this.user = null;
+                        this.userTypeSelected = false; // Show startup screen
+                        console.log('Error occurred, showing startup screen');
+                    }
+                },
+
+                // Methods for admin functionality
+                async openAddProductModal() {
+                    // This would open a modal form to add a new product
+                    alert('Fonctionnalité d\'ajout de produit bientôt disponible!');
+                },
+
+                async editProduct(product) {
+                    // This would open a modal form to edit the product
+                    alert(`Modifier le produit: ${product.title}`);
+                },
+
+                async deleteProduct(product) {
+                    if (confirm(`Êtes-vous sûr de vouloir supprimer le produit: ${product.title}?`)) {
+                        try {
+                            const response = await fetch(`http://127.0.0.1:8000/api/products/${product.id}/`, {
+                                method: 'DELETE',
+                                credentials: 'include'
+                            });
+                            
+                            if (response.ok) {
+                                // Remove product from local data
+                                this.db.products = this.db.products.filter(p => p.id !== product.id);
+                                alert('Produit supprimé avec succès!');
+                            } else {
+                                alert('Erreur lors de la suppression du produit');
+                            }
+                        } catch (error) {
+                            console.error('Error deleting product:', error);
+                            alert('Erreur lors de la suppression du produit');
+                        }
+                    }
+                },
+
+                // Properties for startup screen
+                userTypeSelected: false,
+                appInitialized: false,
+                
+                // Properties for login modal
+                showLoginModal: false,
+                loginForm: {
+                    username: '',
+                    password: ''
+                },
+                loginError: '',
+
+                // Authentication methods
+                selectUserType(type) {
+                    console.log('Selecting user type:', type);
+                    if (type === 'client') {
+                        this.userType = 'client';
+                        this.userTypeSelected = true;
+                        this.showLoginModal = false; // Explicitly hide login modal
+                        this.navItems = [
+                            { id: 'home', label: 'Accueil', icon: 'fa-solid fa-house' },
+                            { id: 'store', label: 'Boutique', icon: 'fa-solid fa-store' },
+                            { id: 'contact', label: 'Contact', icon: 'fa-solid fa-address-book' }
+                        ];
+                        this.currentTab = 'home';
+                        console.log('Set as client, showing home tab');
+                    } else if (type === 'store_owner') {
+                        // For store owners, show login modal instead of directly selecting
+                        this.showLoginModal = true;
+                        console.log('Showing login modal for store owner');
+                    }
+                },
+                
+                // Wrapper method for login button in UI
+                showLoginForBoutique() {
+                    console.log('Boutique login button clicked');
+                    this.selectUserType('store_owner');
+                },
+                
+                async handleLogout() {
+                    console.log('Handle logout called');
+                    const result = await this.logout();
+                    if (result.success) {
+                        alert(result.message);
+                        // Show startup screen again after logout
+                        this.userTypeSelected = false;
+                        console.log('Logout successful, showing startup screen');
+                    } else {
+                        alert(result.message);
+                        console.log('Logout failed');
+                    }
+                },
+
+                // Authentication methods
+                async handleLogin() {
+                    this.loginError = ''; // Clear previous errors
+                    const result = await this.login(this.loginForm.username, this.loginForm.password);
+                    
+                    if (result.success) {
+                        this.showLoginModal = false;
+                        this.loginForm = { username: '', password: '' }; // Reset form
+                        // Don't show alert here since login method already handles navigation
+                    } else {
+                        this.loginError = result.message;
+                    }
+                },
+
+                async login(username, password) {
+                    try {
+                        console.log('Attempting login for user:', username);
+                        const response = await fetch('http://127.0.0.1:8000/api/login/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ username, password }),
+                            credentials: 'include' // Include cookies for session authentication
+                        });
+                        
+                        console.log('Login response status:', response.status);
+                        const data = await response.json().catch(() => ({})); // Handle cases where response isn't JSON
+                        console.log('Login response data:', data);
+                        
+                        if (response.ok) {
+                            this.isAuthenticated = true;
+                            this.user = data.user || {};
+                            console.log('Login successful, user data:', this.user);
+                            
+                            // Determine if user is a store owner by checking if they have a boutique
+                            try {
+                                const dashboardResponse = await fetch('http://127.0.0.1:8000/api/dashboard/', {
+                                    credentials: 'include'
+                                });
+                                
+                                console.log('Dashboard check response status:', dashboardResponse.status);
+                                
+                                if (dashboardResponse.ok) {
+                                    const dashboardData = await dashboardResponse.json();
+                                    this.user = dashboardData; // Use dashboard data as user info if available
+                                    this.userType = 'store_owner';
+                                    this.navItems = [...this.adminNavItems]; // Create a new array to trigger reactivity
+                                    this.currentTab = 'admin';
+                                    console.log('User is store owner, redirecting to admin');
+                                } else {
+                                    this.userType = 'client';
+                                    this.navItems = [
+                                        { id: 'home', label: 'Accueil', icon: 'fa-solid fa-house' },
+                                        { id: 'store', label: 'Boutique', icon: 'fa-solid fa-store' },
+                                        { id: 'contact', label: 'Contact', icon: 'fa-solid fa-address-book' }
+                                    ];
+                                    this.currentTab = 'home';
+                                    console.log('User is client, redirecting to home');
+                                }
+                            } catch (dashboardError) {
+                                console.error('Dashboard check error:', dashboardError);
+                                // Even if dashboard fails, user is still logged in as client
+                                this.userType = 'client';
+                                this.navItems = [
+                                    { id: 'home', label: 'Accueil', icon: 'fa-solid fa-house' },
+                                    { id: 'store', label: 'Boutique', icon: 'fa-solid fa-store' },
+                                    { id: 'contact', label: 'Contact', icon: 'fa-solid fa-address-book' }
+                                ];
+                                this.currentTab = 'home';
+                            }
+                            
+                            // Skip startup screen since user is now authenticated
+                            this.userTypeSelected = true;
+                            
+                            // Close login modal after successful login
+                            this.showLoginModal = false;
+                            
+                            return { success: true, message: 'Connexion réussie' };
+                        } else {
+                            console.log('Login failed:', data.message);
+                            return { success: false, message: data.message || 'Nom d\'utilisateur ou mot de passe incorrect' };
+                        }
+                    } catch (error) {
+                        console.error('Login error:', error);
+                        console.log('Network error details:', error.message);
+                        return { success: false, message: 'Erreur de connexion au serveur: ' + error.message };
+                    }
+                },
+
+                async logout() {
+                    try {
+                        console.log('Making logout request...');
+                        const response = await fetch('http://127.0.0.1:8000/api/logout/', {
+                            method: 'POST',
+                            credentials: 'include' // Include cookies for session authentication
+                        });
+                        
+                        console.log('Logout request completed with status:', response.status);
+                        this.isAuthenticated = false;
+                        this.userType = 'client';
+                        this.user = null;
+                        this.navItems = [
+                            { id: 'home', label: 'Accueil', icon: 'fa-solid fa-house' },
+                            { id: 'store', label: 'Boutique', icon: 'fa-solid fa-store' },
+                            { id: 'contact', label: 'Contact', icon: 'fa-solid fa-address-book' }
+                        ];
+                        this.currentTab = 'home';
+                        this.userTypeSelected = false; // Show startup screen again
+                        
+                        return { success: true, message: 'Déconnexion réussie' };
+                    } catch (error) {
+                        console.error('Logout error:', error);
+                        return { success: false, message: 'Erreur lors de la déconnexion' };
+                    }
                 },
 
                 get filteredProducts() {
@@ -502,11 +990,11 @@
 
                     if (imagePath.startsWith('http')) {
                         // Si c'est une image de votre API, ajouter un paramètre de cache-busting
-                        if (imagePath.includes('delivri.pythonanywhere.com')) {
+                        if (imagePath.includes('delivri.pythonanywhere.com') || imagePath.includes('127.0.0.1') || imagePath.includes('localhost')) {
                             // Pour les images de votre API, ajouter un paramètre de cache-busting
                             const url = new URL(imagePath);
                             url.searchParams.set('t', Date.now().toString());
-                            
+
                             // Pour l'environnement mobile, remplacer http par https pour éviter les problèmes de sécurité
                             if (window.Capacitor || document.URL.indexOf('file://') === 0) {
                                 return url.toString().replace('http://', 'https://');
@@ -526,15 +1014,15 @@
                     if (window.Capacitor || document.URL.indexOf('file://') === 0) {
                         // Environnement mobile - construire l'URL complète pour les chemins relatifs
                         if (imagePath.startsWith('/')) {
-                            // Pour les chemins relatifs commençant par /, les convertir en URL absolue avec HTTPS
-                            return 'https://delivri.pythonanywhere.com' + imagePath;
+                            // Pour les chemins relatifs commençant par /, les convertir en URL absolue avec le serveur local
+                            return 'http://127.0.0.1:8000' + imagePath;
                         } else {
                             // Pour les chemins relatifs sans / initial, les traiter comme des chemins locaux
                             return './' + imagePath; // Chemin relatif standard
                         }
                     } else {
-                        // Environnement web, ajouter le protocole https:// pour les chemins relatifs
-                        return 'https://delivri.pythonanywhere.com' + imagePath + '?t=' + Date.now();
+                        // Environnement web, ajouter le protocole pour les chemins relatifs
+                        return 'http://127.0.0.1:8000' + imagePath + '?t=' + Date.now();
                     }
                 },
 
@@ -654,5 +1142,6 @@
             }
         });
     </script>
+    
 </body>
 </html>
